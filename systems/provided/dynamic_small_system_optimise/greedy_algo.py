@@ -43,6 +43,7 @@ def _find_possible_new_best_live(
 ) -> tuple:
     new_best_value = best_value
     new_solution = best_solution
+    new_best_score = 0.0
 
     per_contract_value = obj_instance.per_contract_value_as_np
     direction = obj_instance.direction_as_np
@@ -62,7 +63,17 @@ def _find_possible_new_best_live(
 
         temp_objective_value = obj_instance.evaluate(temp_step)
 
-        if temp_objective_value < new_best_value:
+        # Rank improvement by the standalone risk of this one-contract step.
+        step_variance = (
+            per_contract_value[i] ** 2 * obj_instance.covariance_matrix_as_np[i, i]
+        )
+        if not np.isfinite(step_variance) or step_variance <= 0:
+            raise ValueError("Movable contract has nonpositive or nonfinite step risk")
+        candidate_score = (best_value - temp_objective_value) / np.sqrt(step_variance)
+
+        if candidate_score > new_best_score:
+            new_best_score = candidate_score
+            # The outer loop still checks the actual, unchanged objective.
             new_best_value = temp_objective_value
             new_solution = temp_step
 
